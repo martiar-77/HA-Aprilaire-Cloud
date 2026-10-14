@@ -28,6 +28,7 @@ from .const import (
     MODE_OFF,
 )
 from .entity import AprilaireEntity, sensor_reading
+from .setpoints import resolve_setpoints
 
 # Aprilaire operates natively in Fahrenheit at 0.5 degF steps, but the API speaks
 # Celsius. We report Celsius and let HA convert to the user's configured unit.
@@ -137,19 +138,22 @@ class AprilaireClimate(AprilaireEntity, ClimateEntity):
     # -- commands -------------------------------------------------------------
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
-        changes: dict[str, Any] = {}
-        if (low := kwargs.get(ATTR_TARGET_TEMP_LOW)) is not None:
-            changes["heat"] = low
-        if (high := kwargs.get(ATTR_TARGET_TEMP_HIGH)) is not None:
-            changes["cool"] = high
+        heat: float | None = kwargs.get(ATTR_TARGET_TEMP_LOW)
+        cool: float | None = kwargs.get(ATTR_TARGET_TEMP_HIGH)
         if (temp := kwargs.get(ATTR_TEMPERATURE)) is not None:
             mode = self.hvac_mode
             if mode == HVACMode.HEAT:
-                changes["heat"] = temp
+                heat = temp
             elif mode == HVACMode.COOL:
-                changes["cool"] = temp
-        if changes:
-            await self.coordinator.async_set_thermostat(**changes)
+                cool = temp
+        if heat is None and cool is None:
+            return
+        # The device only honours whole-degF setpoints encoded as 2-decimal
+        # Celsius, sent as a heat+cool pair that respects the 3 degF deadband.
+        changes = resolve_setpoints(
+            self._settings.get("heat"), self._settings.get("cool"), heat, cool
+        )
+        await self.coordinator.async_set_thermostat(**changes)
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         await self.coordinator.async_set_thermostat(mode=HVAC_TO_MODE[hvac_mode])

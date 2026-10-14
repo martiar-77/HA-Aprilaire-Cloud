@@ -28,7 +28,7 @@ async def test_set_temperature_sets_cool_setpoint(hass, setup_integration, patch
         {"entity_id": ENTITY, "temperature": 22.0},
         blocking=True,
     )
-    patched_cloud.set_thermostat.assert_called_with(DEVICE_ID, "PZ1", cool=22.0)
+    patched_cloud.set_thermostat.assert_called_with(DEVICE_ID, "PZ1", heat=20.0, cool=22.22)
 
 
 async def test_set_fan_mode(hass, setup_integration, patched_cloud):
@@ -81,7 +81,7 @@ async def test_heat_cool_uses_temperature_range(hass, cloud_state, setup_integra
         {"entity_id": ENTITY, "target_temp_low": 19.0, "target_temp_high": 23.0},
         blocking=True,
     )
-    patched_cloud.set_thermostat.assert_called_with(DEVICE_ID, "PZ1", heat=19.0, cool=23.0)
+    patched_cloud.set_thermostat.assert_called_with(DEVICE_ID, "PZ1", heat=18.89, cool=22.78)
 
 
 async def test_sensors_and_binary_sensor(hass, setup_integration):
@@ -138,3 +138,16 @@ async def test_fan_running_off_when_all_equipment_idle(hass, cloud_state, setup_
     cloud_state["status"]["heatingStatus"] = "inactive"
     await setup_integration()
     assert hass.states.get("binary_sensor.whole_home_fan").state == "off"
+
+
+async def test_heat_cool_deadband_pushes_cool(hass, cloud_state, setup_integration, patched_cloud):
+    cloud_state["settings"]["thermostatPZ1"]["mode"] = "auto"
+    await setup_integration()
+    # Heat to 70F (21.11C) with cool at 71F -> cool pushed to 73F.
+    await hass.services.async_call(
+        "climate",
+        "set_temperature",
+        {"entity_id": ENTITY, "target_temp_low": 21.11, "target_temp_high": 21.5},
+        blocking=True,
+    )
+    patched_cloud.set_thermostat.assert_called_with(DEVICE_ID, "PZ1", heat=21.11, cool=22.78)

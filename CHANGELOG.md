@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2-neil.1] - 2026-10-14
+
+### Fixed
+- Heat/cool setpoint writes no longer revert ~20s later. Setpoints are snapped
+  to the nearest whole degF and sent as 2-decimal Celsius (67F -> 19.44), the
+  encoding the thermostat accepts; heat and cool are always sent together.
+- Enforce the app's limits (heat 40-90F, cool 50-93F) and 3F minimum deadband
+  by pushing the companion setpoint.
+
 ## [0.1.1] - 2026-08-23
 
 ### Fixed
